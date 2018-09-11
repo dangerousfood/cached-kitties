@@ -1,6 +1,7 @@
 var router = require('express').Router();
     axios = require('axios');
     responseTime = require('response-time');
+    infura = require('../../../models/infura');
 
 var baseURL = 'https://api.infura.io/v1/jsonrpc';
 
@@ -100,6 +101,32 @@ router.get('/:network/:method', function(req, res, next) {
         res.json(err);
     });
 });
+
+//avg gas
+router.get('/:network/stuff/eth_Gas', function(req, res, next) {
+    var url = baseURL + '/' + req.params.network + '/eth_blockNumber';
+    axios.get(url).then(response => { return response.data.result}).then((blockNumber) => {
+
+        let decBlockNum = parseInt(blockNumber, 16)
+        let blocksPerDay = 6800;
+        let promises = [];
+        for(i=0; i<blocksPerDay; i++){
+            let urlGetBlockByNumber = baseURL + '/' + req.params.network +'/'+ 'eth_gasPrice?params=["0x'+(decBlockNum-i).toString(16)+'",false]'
+            promises.push(query(urlGetBlockByNumber,req.cache))
+        }
+        Promise.all(promises).then(prices => {
+            let total = 0;
+            for(let i=0; i<prices.length; i++)total+=parseInt(prices[i].result,16);
+            if(prices.length && total)return '0x'+(Math.floor(total/prices.length)).toString(16);
+            return '0x'+(0).toString(16);
+        }).then(result => {
+            res.status(200).json(result)
+        }).catch(err => {
+            res.json(err);
+        });
+    });
+});
+
 
 function query(url,cache){
     return new Promise((resolve,reject) => {
